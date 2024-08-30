@@ -1,36 +1,3 @@
-import asyncio
-import nest_asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-import psycopg2
-from datetime import datetime
-from config import dbname, user, password, host, port
-
-# Apply the nest_asyncio patch
-nest_asyncio.apply()
-
-# Connect to PostgreSQL database
-conn = psycopg2.connect(
-    dbname=dbname[0],
-    user=user[0],
-    password=password[0],
-    host=host[0],
-    port=port
-)
-
-def get_user_id(tg_id):
-
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT user_id FROM public."user" WHERE tg_id = %s
-        """, (str(tg_id),))
-        user_id = cur.fetchone()
-
-    return user_id
-
-# Global variable to store user data
-user_sessions = {}
-
 # Function to fetch a question from the database
 def get_random_question(domain):
     with conn.cursor() as cur:
@@ -206,20 +173,3 @@ async def return_to_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Call the start function with the original update object
     await start(update, context)
-
-async def main():
-    application = Application.builder().token("7213212919:AAFSFnnshDBcG7oMbOH3195udH0EvGVqGJw").build()
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(start_exam, pattern='start_exam'))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question_count))
-    application.add_handler(CallbackQueryHandler(select_area, pattern=r'^(CIA|CISA|PMP|Python|English|Russian Auditor License|Leaders of Russia Challenge)$'))
-    application.add_handler(CallbackQueryHandler(answer_question, pattern=r'^(A|B|C|D)-\d+$'))
-    application.add_handler(CallbackQueryHandler(return_to_start, pattern='OK'))
-
-    await application.run_polling()
-
-if __name__ == '__main__':
-    # Use the existing event loop instead of asyncio.run
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
