@@ -47,13 +47,19 @@ def format_long_text(text, width=30):
 
 # Start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print('update.effective_user.id', update.effective_user.id)
-    user_sessions[get_user_id(update.effective_user.id)] = {'questions': [], 'current_question': None, 'correct_count': 0}
+    user_id = update.effective_user.id
+    print('update.effective_user.id', user_id)
+
+    # Check if the start was triggered by a message or a callback query
+    message = update.message if update.message else update.callback_query.message
+
+    user_sessions[get_user_id(user_id)] = {'questions': [], 'current_question': None, 'correct_count': 0}
     
     # Start menu with "Start Exam" button
     keyboard = [[InlineKeyboardButton("Start Exam", callback_data='start_exam')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Welcome! Please press "Start Exam" to begin.', reply_markup=reply_markup)
+    
+    await message.reply_text('Welcome! Please press "Start Exam" to begin.', reply_markup=reply_markup)
 
 # Callback handler for start exam button
 async def start_exam(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,14 +111,14 @@ async def handle_question_count(update: Update, context: ContextTypes.DEFAULT_TY
 # Function to ask a question
 async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    domain = user_sessions[get_user_id(update.effective_user.id)]['domain']
+    domain = user_sessions[get_user_id(user_id)]['domain']
     question_data = get_random_question(domain)
     
     if question_data:
         question_id, question_text, option_a, option_b, option_c, option_d, correct_answer = question_data
         
         # Store the current question in the session
-        user_sessions[get_user_id(update.effective_user.id)]['current_question'] = {
+        user_sessions[get_user_id(user_id)]['current_question'] = {
             'question_id': question_id,
             'correct_answer': correct_answer
         }
@@ -132,9 +138,15 @@ async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("C", callback_data=f'C-{question_id}'), InlineKeyboardButton("D", callback_data=f'D-{question_id}')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(formatted_question, reply_markup=reply_markup)
+
+        # Determine where to send the reply (from a message or callback query)
+        if update.message:
+            await update.message.reply_text(formatted_question, reply_markup=reply_markup)
+        else:
+            await update.callback_query.message.reply_text(formatted_question, reply_markup=reply_markup)
+
     else:
-        await update.message.reply_text('No questions available in this domain.')
+        await update.callback_query.message.reply_text('No questions available in this domain.')
 
 # Callback handler for answer selection
 async def answer_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -190,8 +202,9 @@ async def answer_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def return_to_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    await start(query, context)
+
+    # Call the start function with the original update object
+    await start(update, context)
 
 async def main():
     application = Application.builder().token("7213212919:AAFSFnnshDBcG7oMbOH3195udH0EvGVqGJw").build()
